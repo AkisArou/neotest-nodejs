@@ -527,9 +527,71 @@ local function node_result_file(file, target_file)
   return file
 end
 
+local function node_event_key(file, target_file, active, nesting, name)
+  local keyid = node_result_file(file, target_file)
+
+  for index = 0, nesting - 1 do
+    if active[index] then
+      keyid = keyid .. "::" .. active[index]
+    end
+  end
+
+  if name then
+    keyid = keyid .. "::" .. name
+  end
+
+  return keyid
+end
+
+local function node_active_key(file, target_file, active, nesting)
+  if not active[nesting] then
+    return
+  end
+
+  local keyid = node_result_file(file, target_file)
+
+  for index = 0, nesting do
+    if active[index] then
+      keyid = keyid .. "::" .. active[index]
+    end
+  end
+
+  return keyid
+end
+
+local function add_message(messages, key, message)
+  if not key or not message or message == "" then
+    return
+  end
+
+  messages[key] = messages[key] or {}
+  table.insert(messages[key], message)
+end
+
+local function node_event_message(kind, data)
+  local message = data.message
+
+  if not message or message == "" then
+    return
+  end
+
+  return ("[%s] %s"):format(kind, message:gsub("%s+$", ""))
+end
+
+local function append_result_messages(result, messages)
+  if not messages or #messages == 0 then
+    return
+  end
+
+  result.short = result.short .. "\n\nNode test output:\n" .. table.concat(messages, "\n")
+end
+
 local function parsed_node_events_to_results(events, consoleOut, target_file)
   local tests = {}
   local active = {}
+  local result_files = {}
+  local messages_by_key = {}
+  local messages_by_file = {}
 
   for _, event in ipairs(events) do
     local data = event.data or {}
@@ -547,15 +609,8 @@ local function parsed_node_events_to_results(events, consoleOut, target_file)
       and data.file
       and data.name ~= data.file
     then
-      local keyid = node_result_file(data.file, target_file)
-
-      for index = 0, nesting - 1 do
-        if active[index] then
-          keyid = keyid .. "::" .. active[index]
-        end
-      end
-
-      keyid = keyid .. "::" .. data.name
+      local result_file = node_result_file(data.file, target_file)
+      local keyid = node_event_key(data.file, target_file, active, nesting, data.name)
 
       local status = event.type == "test:fail" and ResultStatus.failed or ResultStatus.passed
 
@@ -572,6 +627,7 @@ local function parsed_node_events_to_results(events, consoleOut, target_file)
           column = data.column,
         },
       }
+      result_files[keyid] = result_file
 
       if event.type == "test:fail" then
         local msg = node_error_message(details.error)
@@ -584,7 +640,40 @@ local function parsed_node_events_to_results(events, consoleOut, target_file)
           },
         }
       end
+    elseif event.type == "test:diagnostic" then
+      local message = node_event_message("diagnostic", data)
+      local keyid = data.file and node_active_key(data.file, target_file, active, nesting)
+
+      if keyid then
+        add_message(messages_by_key, keyid, message)
+      elseif data.file then
+        add_message(messages_by_file, node_result_file(data.file, target_file), message)
+      end
+    elseif event.type == "test:stdout" or event.type == "test:stderr" then
+      local kind = event.type == "test:stdout" and "stdout" or "stderr"
+      local message = node_event_message(kind, data)
+      local keyid = data.file and node_active_key(data.file, target_file, active, nesting)
+
+      if keyid then
+        add_message(messages_by_key, keyid, message)
+      elseif data.file then
+        add_message(messages_by_file, node_result_file(data.file, target_file), message)
+      end
     end
+  end
+
+  for keyid, result in pairs(tests) do
+    local messages = {}
+
+    for _, message in ipairs(messages_by_key[keyid] or {}) do
+      table.insert(messages, message)
+    end
+
+    for _, message in ipairs(messages_by_file[result_files[keyid]] or {}) do
+      table.insert(messages, message)
+    end
+
+    append_result_messages(result, messages)
   end
 
   return tests

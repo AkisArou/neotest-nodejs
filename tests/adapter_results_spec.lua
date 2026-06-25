@@ -167,4 +167,116 @@ describe("adapter.results", function()
     ---@diagnostic disable-next-line: undefined-field
     lib.files.read:revert()
   end)
+
+  async.it("creates todo results as skipped", function()
+    package.loaded["neotest-nodejs"] = nil
+    local adapter = require("neotest-nodejs")({})
+    local output = node_output({
+      event("test:pass", {
+        nesting = 0,
+        name = "todo test",
+        line = 14,
+        column = 1,
+        file = path,
+        todo = true,
+        details = { type = "test" },
+      }),
+    })
+
+    stub(lib.files, "read", output)
+
+    local results = adapter.results(spec, strategy_result, {
+      data = function()
+        return { path = path }
+      end,
+    })
+
+    assert.are.same(types.ResultStatus.skipped, results[path .. "::todo test"].status)
+
+    ---@diagnostic disable-next-line: undefined-field
+    lib.files.read:revert()
+  end)
+
+  async.it("adds diagnostics to matching test output", function()
+    package.loaded["neotest-nodejs"] = nil
+    local adapter = require("neotest-nodejs")({})
+    local output = node_output({
+      event("test:start", {
+        nesting = 0,
+        name = "diagnostic test",
+        line = 16,
+        column = 1,
+        file = path,
+      }),
+      event("test:pass", {
+        nesting = 0,
+        name = "diagnostic test",
+        line = 16,
+        column = 1,
+        file = path,
+        details = { type = "test" },
+      }),
+      event("test:diagnostic", {
+        nesting = 0,
+        message = "created useful diagnostic",
+        level = "info",
+        line = 16,
+        column = 1,
+        file = path,
+      }),
+    })
+
+    stub(lib.files, "read", output)
+
+    local results = adapter.results(spec, strategy_result, {
+      data = function()
+        return { path = path }
+      end,
+    })
+
+    assert.matches(
+      "%[diagnostic%] created useful diagnostic",
+      results[path .. "::diagnostic test"].short
+    )
+
+    ---@diagnostic disable-next-line: undefined-field
+    lib.files.read:revert()
+  end)
+
+  async.it("adds stdout and stderr to file results", function()
+    package.loaded["neotest-nodejs"] = nil
+    local adapter = require("neotest-nodejs")({})
+    local output = node_output({
+      event("test:stdout", {
+        file = path,
+        message = "hello stdout\n",
+      }),
+      event("test:stderr", {
+        file = path,
+        message = "hello stderr\n",
+      }),
+      event("test:pass", {
+        nesting = 0,
+        name = "logs output",
+        line = 18,
+        column = 1,
+        file = path,
+        details = { type = "test" },
+      }),
+    })
+
+    stub(lib.files, "read", output)
+
+    local results = adapter.results(spec, strategy_result, {
+      data = function()
+        return { path = path }
+      end,
+    })
+
+    assert.matches("%[stdout%] hello stdout", results[path .. "::logs output"].short)
+    assert.matches("%[stderr%] hello stderr", results[path .. "::logs output"].short)
+
+    ---@diagnostic disable-next-line: undefined-field
+    lib.files.read:revert()
+  end)
 end)

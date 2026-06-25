@@ -33,4 +33,6 @@ describe("calculator", () => {
   test("skipped example", { skip: true }, () => {
     assert.fail("This skipped test should not run");
   });
+
+  test("todo example", { todo: true });
 });
