@@ -1,0 +1,10 @@
+{
+  "name": "spec",
+  "version": "1.0.0",
+  "description": "neotest-nodejs spec",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test"
+  }
+}
