@@ -319,6 +319,32 @@ describe("adapter.build_spec", function()
     assert.stub(vim.notify).was_not_called()
   end)
 
+  async.it("keeps node arguments isolated between adapter instances", function()
+    local default_adapter = require("neotest-nodejs")({ nodeCommand = "node" })
+    local custom_adapter = require("neotest-nodejs")({
+      nodeCommand = "node",
+      nodeArguments = function(defaultArguments)
+        return vim.list_extend({ "--custom-loader" }, defaultArguments)
+      end,
+    })
+
+    local path = "./spec/tests/basic.test.ts"
+    local positions = default_adapter.discover_positions(path):to_list()
+    local tree = Tree.from_list(positions, function(pos)
+      return pos.id
+    end)
+
+    local default_spec = default_adapter.build_spec({ tree = tree })
+    local custom_spec = custom_adapter.build_spec({ tree = tree })
+
+    assert.is.truthy(default_spec)
+    assert.is.truthy(custom_spec)
+    assert._not.contains(default_spec.command, "--custom-loader")
+    assert.contains(custom_spec.command, "--custom-loader")
+
+    assert.stub(vim.notify).was_not_called()
+  end)
+
   async.it("handles incorrect node arguments returned by function", function()
     local adapter = require("neotest-nodejs")({
       nodeCommand = "node",

@@ -22,16 +22,12 @@ local ResultStatus = types.ResultStatus
 ---@field strategy_config? table<string, unknown> | fun(): table<string, unknown>
 ---@field isTestFile async fun(file_path: string?): boolean
 
----@type neotest.Adapter
-local adapter = { name = "neotest-nodejs" }
+local M = {}
 
-adapter.root = function(path)
+local function root(path)
   return lib.files.match_root_pattern("package.json")(path)
 end
 
-local getNodeCommand = node_util.getNodeCommand
-local getNodeArguments = node_util.getNodeArguments
-local isTestFile = node_util.defaultIsTestFile
 local reporter_path =
   util.path.join(debug.getinfo(1, "S").source:sub(2):match("(.*/)"), "reporter.cjs")
 
@@ -85,11 +81,11 @@ end
 ---@async
 ---@param file_path? string
 ---@return boolean
-function adapter.is_test_file(file_path)
-  return isTestFile(file_path)
+local function default_is_test_file(file_path)
+  return node_util.defaultIsTestFile(file_path)
 end
 
-function adapter.filter_dir(name)
+local function filter_dir(name)
   return name ~= "node_modules"
 end
 
@@ -105,7 +101,7 @@ local function get_match_type(captured_nodes)
 end
 
 -- Enrich `it.each` tests with metadata about TS node position
-function adapter.build_position(file_path, source, captured_nodes)
+function M.build_position(file_path, source, captured_nodes)
   local match_type = get_match_type(captured_nodes)
 
   if not match_type then
@@ -158,7 +154,7 @@ end
 
 ---@async
 ---@return neotest.Tree | nil
-function adapter.discover_positions(path)
+local function discover_positions(path)
   -- NOTE: Combining queries with a second argument that can be either
   -- arrow_function, function_expression, or call_expression seems to
   -- change the order of the matches so that namespaces or listed after
@@ -600,7 +596,7 @@ end
 
 ---@param args neotest.RunArgs
 ---@return neotest.RunSpec | nil
-function adapter.build_spec(args)
+local function build_spec(adapter_config, args)
   local tree = args.tree
 
   if not tree then
@@ -631,7 +627,7 @@ function adapter.build_spec(args)
     end
   end
 
-  local binary = args.nodeCommand or getNodeCommand(pos.path)
+  local binary = args.nodeCommand or adapter_config.getNodeCommand(pos.path)
   local command = vim.split(binary, "%s+")
 
   ---@type string
@@ -643,8 +639,10 @@ function adapter.build_spec(args)
     testNamePattern = testNamePattern,
   }
 
-  local options =
-    getNodeArguments(node_util.getNodeDefaultArguments(nodeArgsContext), nodeArgsContext)
+  local options = adapter_config.getNodeArguments(
+    node_util.getNodeDefaultArguments(nodeArgsContext),
+    nodeArgsContext
+  )
 
   if compat.tbl_islist(options) then
     vim.list_extend(command, options)
@@ -669,7 +667,7 @@ function adapter.build_spec(args)
 
   table.insert(command, vim.fs.normalize(pos.path))
 
-  local cwd = getCwd(pos.path)
+  local cwd = adapter_config.getCwd(pos.path)
 
   -- Creating empty file for streaming results
   lib.files.write(results_path, "")
@@ -694,11 +692,11 @@ function adapter.build_spec(args)
         return parsed_output_to_results(new_results, nil, pos.path)
       end
     end,
-    strategy = getStrategyConfig(
+    strategy = adapter_config.getStrategyConfig(
       get_default_strategy_config(args.strategy, command, cwd) or {},
       args
     ),
-    env = getEnv(args[2] and args[2].env or {}),
+    env = adapter_config.getEnv(args[2] and args[2].env or {}),
   }
 end
 
@@ -707,7 +705,7 @@ end
 ---@param result neotest.StrategyResult
 ---@param tree neotest.Tree
 ---@return table<string, neotest.Result>
-function adapter.results(spec, result, tree)
+local function results(spec, result, tree)
   spec.context.stop_stream()
 
   local output_file = spec.context.results_path
@@ -739,28 +737,53 @@ local function resolve_config_option(value, default, reject_value)
   return default
 end
 
-setmetatable(adapter, {
-  ---@param opts neotest.NodejsOptions
+---@param opts? neotest.NodejsOptions
+---@return neotest.Adapter
+local function create_adapter(opts)
+  opts = opts or {}
+
+  local adapter_config = {
+    getNodeCommand = resolve_config_option(opts.nodeCommand, node_util.getNodeCommand),
+    getNodeArguments = resolve_config_option(opts.nodeArguments, node_util.getNodeArguments, true),
+    getCwd = resolve_config_option(opts.cwd, getCwd),
+    getStrategyConfig = resolve_config_option(opts.strategy_config, getStrategyConfig),
+    getEnv = getEnv,
+    isTestFile = resolve_config_option(opts.isTestFile, default_is_test_file, true),
+  }
+
+  if util.is_callable(opts.env) then
+    adapter_config.getEnv = opts.env
+  elseif opts.env then
+    adapter_config.getEnv = function(specEnv)
+      return vim.tbl_extend("force", opts.env, specEnv)
+    end
+  end
+
+  ---@type neotest.Adapter
+  local adapter = {
+    name = "neotest-nodejs",
+    root = root,
+    filter_dir = filter_dir,
+    build_position = M.build_position,
+    discover_positions = discover_positions,
+    results = results,
+  }
+
+  function adapter.is_test_file(file_path)
+    return adapter_config.isTestFile(file_path)
+  end
+
+  function adapter.build_spec(args)
+    return build_spec(adapter_config, args)
+  end
+
+  return adapter
+end
+
+setmetatable(M, {
   __call = function(_, opts)
-    getNodeCommand = resolve_config_option(opts.nodeCommand, getNodeCommand)
-    getNodeArguments = resolve_config_option(opts.nodeArguments, getNodeArguments, true)
-    getCwd = resolve_config_option(opts.cwd, getCwd)
-    getStrategyConfig = resolve_config_option(opts.strategy_config, getStrategyConfig)
-
-    if util.is_callable(opts.env) then
-      getEnv = opts.env
-    elseif opts.env then
-      getEnv = function(specEnv)
-        return vim.tbl_extend("force", opts.env, specEnv)
-      end
-    end
-
-    if util.is_callable(opts.isTestFile) then
-      isTestFile = opts.isTestFile
-    end
-
-    return adapter
+    return create_adapter(opts)
   end,
 })
 
-return adapter
+return M
