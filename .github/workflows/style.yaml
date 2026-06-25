@@ -15,8 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: JohnnyMorganz/stylua-action@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          version: v2.3.1
-          args: --color always --check .
+      - name: Install StyLua
+        run: cargo install stylua --version 2.3.1 --locked
+      - name: Check formatting
+        run: stylua --color always --check .

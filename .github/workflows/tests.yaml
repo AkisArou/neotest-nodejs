@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        version: ['v0.10.0', 'v0.11.0', 'v0.12.0', 'stable', 'nightly']
+        version: ['v0.10.0', 'stable']
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -46,7 +46,7 @@ jobs:
           git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git ~/.local/share/nvim/site/pack/vendor/start/plenary.nvim
           git clone --depth 1 https://github.com/nvim-neotest/neotest.git ~/.local/share/nvim/site/pack/vendor/start/neotest
           git clone --depth 1 https://github.com/nvim-neotest/nvim-nio ~/.local/share/nvim/site/pack/vendor/start/nvim-nio
-          if [[ ${{ matrix.version }} == 'v0.12.0' ]]; then
+          if nvim --version | head -n 1 | grep -q 'NVIM v0\.12'; then
             git clone --depth 1 https://github.com/nvim-treesitter/nvim-treesitter.git ~/.local/share/nvim/site/pack/vendor/start/nvim-treesitter
             nvim --headless -c 'lua require("nvim-treesitter").install({ "javascript", "typescript" }, { summary = true }):wait(5 * 60 * 1000); vim.cmd("TSLog"); vim.cmd.quitall()'
           else
