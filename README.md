@@ -107,6 +107,38 @@ Type: `async fun(file_path: string?): boolean`
 Override test file detection. The default matcher checks common test filename
 patterns such as `*.test.js`, `*.spec.ts`, and files under `__tests__`.
 
+## Project-specific configuration
+
+Each `require("neotest-nodejs")({...})` call creates an independent adapter
+instance. This means you can keep a global default adapter and configure a
+different adapter for a specific project without the options overwriting each
+other.
+
+Use Neotest's `setup_project()` for project-local Node flags:
+
+```lua
+local project_root = "/path/to/project"
+local polyfills_path = project_root .. "/polyfills/index.ts"
+
+require("neotest").setup_project(project_root, {
+  adapters = {
+    require("neotest-nodejs")({
+      nodeCommand = "node",
+      nodeArguments = function(default_args)
+        return vim.list_extend({
+          "--experimental-transform-types",
+          "--no-warnings=ExperimentalWarning",
+          "--import=" .. polyfills_path,
+        }, default_args)
+      end,
+    }),
+  },
+})
+```
+
+This is preferable to mutating adapter options after `neotest.setup()`, because
+Neotest stores configured adapter instances per project.
+
 ## TypeScript
 
 This adapter runs `node --test` directly. TypeScript support depends on your
