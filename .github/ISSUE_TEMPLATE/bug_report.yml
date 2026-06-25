@@ -28,7 +28,7 @@ body:
   - type: input
     attributes:
       label: "Neovim version (nvim -v)"
-      placeholder: "0.9.0 commit 1234567"
+      placeholder: "0.10.0 commit 1234567"
     validations:
       required: true
   - type: input

@@ -12,7 +12,7 @@ support.
 
 ## Requirements
 
-- Neovim 0.9 or newer
+- Neovim 0.10 or newer
 - Neotest 4.0.0 or newer
 - Node.js with the built-in test runner
 - Tree-sitter parsers for the languages you test, usually `javascript`,
