@@ -20,7 +20,15 @@ support.
 
 ## Installation
 
-With `vim.pack` while developing from this checkout:
+Install with `vim.pack`:
+
+```lua
+vim.pack.add({
+  "https://github.com/AkisArou/neotest-nodejs",
+})
+```
+
+While developing from a local checkout, prepend it to `runtimepath` instead:
 
 ```lua
 vim.opt.rtp:prepend("/path/to/neotest-nodejs")
