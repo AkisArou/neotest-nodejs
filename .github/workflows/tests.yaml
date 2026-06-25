@@ -32,11 +32,7 @@ jobs:
         with:
           node-version: 24
       - name: Install npm packages
-        run: |
-          npm install -g tree-sitter-cli@latest
-          cd ./spec
-          npm ci
-          cd ..
+        run: npm install -g tree-sitter-cli@latest
       - name: Verify tree-sitter-cli installation
         run: tree-sitter --version
       - name: Neovim setup
@@ -63,4 +59,7 @@ jobs:
           ./scripts/test
       - name: Dump neotest log
         if: '!cancelled()'
-        run: cat ~/.local/state/nvim/neotest.log
+        run: |
+          if [[ -f ~/.local/state/nvim/neotest.log ]]; then
+            cat ~/.local/state/nvim/neotest.log
+          fi
