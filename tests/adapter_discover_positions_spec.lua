@@ -10,14 +10,6 @@ test_utils.prepare_vim_treesitter()
 describe("adapter.discover_positions", function()
   assert:set_parameter("TableFormatLevel", 10)
 
-  ---@param testname string
-  ---@return string
-  local function get_test_absolute_path(testname)
-    -- vim.fs.abspath is 0.11.0+ so use vim.fs.find to get an absolute path. Do not use the
-    -- 'path' option since then it returns a relative path
-    return vim.fs.find(testname, { type = "file", limit = 1, upward = false })[1]
-  end
-
   async.it("provides meaningful names from a basic spec", function()
     package.loaded["neotest-nodejs"] = nil
 

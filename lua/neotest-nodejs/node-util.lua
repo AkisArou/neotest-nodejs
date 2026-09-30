@@ -61,10 +61,10 @@ function M.defaultIsTestFile(file_path)
       arguments: (arguments (string (string_fragment) @module))) @dependency
   ]]
   )
-  for _, match in query:iter_matches(root, content, 0, -1, { all = false }) do
+  for _, match in query:iter_matches(root, content, 0, -1) do
     local module, dependency, func
     for id, nodes in pairs(match) do
-      local captured = type(nodes) == "table" and nodes[1] or nodes
+      local captured = nodes[1]
       local name = query.captures[id]
       if name == "module" then
         module = vim.treesitter.get_node_text(captured, content)
