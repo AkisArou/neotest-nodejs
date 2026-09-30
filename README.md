@@ -113,7 +113,11 @@ Custom strategy configuration, for example for `nvim-dap`.
 Type: `async fun(file_path: string?): boolean`
 
 Override test file detection. The default matcher checks common test filename
-patterns such as `*.test.js`, `*.spec.ts`, and files under `__tests__`.
+patterns such as `*.test.js`, `*.spec.ts`, and files under `__tests__`. Files with
+runtime imports from `vitest` are excluded, including `require("vitest")` and
+`import("vitest")`. Native Node.js tests in the same package remain eligible.
+If file contents or a Tree-sitter parser are unavailable, detection falls back
+to the filename.
 
 ## TypeScript
 
